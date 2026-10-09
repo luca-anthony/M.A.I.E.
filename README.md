@@ -1,0 +1,2 @@
+# M.A.I.E.
+Multi-purpose AI for Interactive Environments
