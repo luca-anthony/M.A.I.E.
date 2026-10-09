@@ -1,0 +1,8 @@
+ollama>=0.4.0
+numpy
+sounddevice
+soundfile
+faster-whisper>=1.0.0
+opencv-python-headless
+pygame
+bambulabs_api

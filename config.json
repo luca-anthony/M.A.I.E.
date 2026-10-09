@@ -1,0 +1,140 @@
+{
+  "profile": "auto",
+  "mode": "online",
+  "assistant_name": "MAIE",
+  "system_prompt": "You are M.A.I.E., a workshop assistant that lives in the user's room. Your replies are spoken aloud, so keep them short and conversational, one to three sentences unless asked for more detail. Do not use markdown, lists, emojis, or special symbols. When an image from the desk camera is provided, answer based on what is visible in it. If you are unsure, say so.",
+  "max_history": 20,
+  "keep_alive": "30m",
+  "health_ttl": 5,
+  "probe_timeout": 2,
+  "backends": {
+    "online": {
+      "host": "http://localhost:11434",
+      "model": "gemma4:31b-cloud",
+      "api_key_env": "OLLAMA_API_KEY",
+      "timeout": 120,
+      "vision": true,
+      "options": {}
+    },
+    "pc": {
+      "host": "http://192.168.1.50:11434",
+      "model": "gemma3:12b",
+      "api_key_env": null,
+      "timeout": 120,
+      "vision": true,
+      "options": {}
+    },
+    "local": {
+      "host": "http://localhost:11434",
+      "model": "gemma3:4b",
+      "api_key_env": null,
+      "timeout": 300,
+      "vision": true,
+      "options": {
+        "num_ctx": 2048
+      }
+    }
+  },
+  "audio": {
+    "input_device": null,
+    "output_device": null
+  },
+  "stt": {
+    "model": "large-v3",
+    "fallback_model": "small.en",
+    "device": "auto",
+    "compute_type": "auto",
+    "language": "en",
+    "beam_size": 1,
+    "no_speech_max": 0.6
+  },
+  "listen": {
+    "block_seconds": 0.1,
+    "preroll_seconds": 0.5,
+    "silence_seconds": 1.2,
+    "max_seconds": 20,
+    "min_speech_seconds": 0.4,
+    "min_level": 0.008,
+    "level_multiplier": 3.0,
+    "ambient_seconds": 0.6
+  },
+  "wake": {
+    "enabled": true,
+    "follow_up_seconds": 20,
+    "words": ["maie", "mai", "may", "mae", "maye", "m\\W*a\\W*i\\W*e", "m\\W*a\\W*y"]
+  },
+  "tts": {
+    "enabled": true,
+    "order": ["kokoro", "piper", "espeak"],
+    "kokoro_lang": "a",
+    "kokoro_voice": "af_heart",
+    "piper_model": "models/piper/en_US-lessac-medium.onnx",
+    "mute_tail_seconds": 0.4,
+    "min_sentence_chars": 20
+  },
+  "camera": {
+    "backend": "opencv",
+    "index": 0,
+    "width": 1920,
+    "height": 1080,
+    "max_side": 1280,
+    "rotate": 0,
+    "warmup_seconds": 1.5,
+    "save_dir": "captures"
+  },
+  "projector": {
+    "library": "projections",
+    "cache": "cache",
+    "display_index": 1,
+    "fullscreen": true,
+    "rotate": 0,
+    "flip": false,
+    "scale": 1.0,
+    "offset_x": 0,
+    "offset_y": 0,
+    "match_threshold": 0.6
+  },
+  "printer": {
+    "enabled": false,
+    "ip": "",
+    "serial": "",
+    "access_code_env": "MAIE_PRINTER_ACCESS_CODE",
+    "library": "prints",
+    "plate": 1,
+    "match_threshold": 0.6
+  },
+  "vision_triggers": [
+    "look at this",
+    "look at that",
+    "take a look",
+    "what is this",
+    "what's this",
+    "what is that",
+    "what's that",
+    "what do you see",
+    "what can you see",
+    "what you see",
+    "can you see",
+    "read this",
+    "identify this",
+    "what am i holding",
+    "check this out"
+  ],
+  "profiles": {
+    "pc": {
+      "camera": {"backend": "opencv"},
+      "projector": {"fullscreen": false}
+    },
+    "pi": {
+      "stt": {
+        "model": "base.en",
+        "fallback_model": "tiny.en",
+        "device": "cpu",
+        "compute_type": "int8"
+      },
+      "tts": {"order": ["piper", "espeak"]},
+      "camera": {"backend": "picamera2"},
+      "projector": {"fullscreen": true}
+    }
+  }
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=M.A.I.E. assistant
+After=network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/MAIE
+ExecStart=%h/MAIE/.venv/bin/python main.py --mode pc
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
