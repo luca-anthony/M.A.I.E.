@@ -1,0 +1,6 @@
+| CORE COMPONENT       | HARDWARE        | PRIMARY SOFTWARE |
+| Intelligence         | Pi5             | Ollama           |
+| Storage+Media Server | 3TBHDD+PiSD     | Jellyfin         |
+| Vision               | PiCam+Projector | OpenCV+Mediapipe |
+| Voice Interface      | Mic+Speaker     | Whisper/eSpeak   |
+| Fabrication Control  | BambuLabP2S     | Octoprint        |
