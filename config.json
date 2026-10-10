@@ -18,7 +18,7 @@
     },
     "pc": {
       "host": "http://192.168.1.50:11434",
-      "model": "gemma3:12b",
+      "model": "gemma3:31b",
       "api_key_env": null,
       "timeout": 120,
       "vision": true,
@@ -74,7 +74,7 @@
   },
   "camera": {
     "backend": "opencv",
-    "index": 0,
+    "index": 8,
     "width": 1920,
     "height": 1080,
     "max_side": 1280,

@@ -1,3 +1,4 @@
+import ast
 import os
 import shutil
 import subprocess
@@ -41,7 +42,19 @@ class Projector:
         )
         return prefix.with_suffix(".png")
 
-    def show(self, path):
+    def resolution(self):
+        configured = self.cfg.get("resolution")
+        if configured:
+            return int(configured[0]), int(configured[1])
+        if not self.cfg["fullscreen"]:
+            return 1280, 720
+        query = "import pygame; pygame.display.init(); print(pygame.display.get_desktop_sizes())"
+        out = subprocess.run([sys.executable, "-c", query], capture_output=True, text=True, timeout=20)
+        sizes = ast.literal_eval(out.stdout.strip().splitlines()[-1])
+        index = max(0, min(self.cfg["display_index"], len(sizes) - 1))
+        return int(sizes[index][0]), int(sizes[index][1])
+
+    def show(self, path, raw=False):
         image = self.prepare(path)
         self.clear()
         command = [
@@ -65,6 +78,8 @@ class Projector:
             command.append("--flip")
         if not self.cfg["fullscreen"]:
             command.append("--windowed")
+        if raw:
+            command.append("--raw")
         self.log = open(self.cache / "projector.log", "w")
         self.process = subprocess.Popen(
             command, cwd=str(ROOT), stdout=self.log, stderr=self.log, env=os.environ.copy()

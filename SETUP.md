@@ -111,7 +111,27 @@ Steps:
 3. Copy PNG, JPG, or PDF files into `projections/`.
 4. In the program type `/project bracket` (partial names work). Press Esc on the projected window or type `/unproject` to clear it.
 5. Mounted upside down or mirrored: set `projector.rotate` (0, 90, 180, 270) and `projector.flip`. Nudge alignment with `projector.scale`, `projector.offset_x`, and `projector.offset_y`.
-6. Keystone and camera-to-projector calibration (needed for hand tracking) is the next development step and is not included yet.
+6. Camera-to-projector alignment and focus are automatic, see the next two sections.
+
+### Auto-calibration (camera to projector)
+
+1. Mount the camera so it can see the whole projected area with a little margin. If it cannot see all of it, calibration fails.
+2. Dim the room a little and clear the desk.
+3. Type `/calibrate` or say "MAIE, calibrate". The projector shows a grid of markers for a few seconds. The camera finds them, computes the exact mapping between camera pixels and desk pixels, and saves it to `calibration.json`. On a Camera Module 3 it also autofocuses on the desk and locks the focus so your hands do not make it hunt.
+4. The result reads like "12 markers, 0.6 pixel error, accuracy good". Under 5 pixels is good. The limit is `calibration.max_rms`.
+5. `/calibrate check` tests whether the saved calibration still matches. Set `calibration.auto_on_start` to `true` to have M.A.I.E. check at every start and recalibrate only when needed.
+6. Whenever you move the camera or projector, run `/calibrate` again. It takes about ten seconds.
+7. If it fails, open `cache/calibration_debug.jpg` to see what the camera saw. Usual causes are a camera that cannot see the whole projection, too much room light, or a camera that is out of focus.
+8. To test with a monitor instead of the projector, aim the camera at the monitor, set `profiles.pi.projector.fullscreen` to `true`, and set `projector.display_index` to the monitor number. Glare and screen patterns can raise the error a little.
+
+Limits: this assumes a flat desk. A wide-angle camera lens bends straight lines, which shows up as a higher pixel error.
+
+### Projector focus assist
+
+1. Run `/focus`. The projector shows a fine checkerboard. The camera focus is locked first, so the readings measure the projector.
+2. Turn the projector focus ring slowly past the sharpest point and then back. The tone rises in pitch as the image gets sharper, and a bar shows the sharpness at the center and four corners.
+3. Stop when the center bar is full and the tone is at its highest. Type `/focus stop` to end it. It also ends by itself after two minutes. The microphone is muted while it runs.
+4. If the corners stay well below the center at best focus, the projector is aimed at the desk at an angle and one side is out of the lens focus range. Reduce the angle, or pick the best compromise.
 
 ## Phase 9: 3D printer (Bambu Lab P2S)
 

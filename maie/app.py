@@ -3,14 +3,16 @@ import re
 import threading
 import time
 
-from audio import Listener
-from brain import MODES, Brain, BrainUnavailable
-from intents import WakeGate, parse
-from printer import PrinterBridge
-from projector import Projector
-from speech import Speaker
-from textutil import SentenceBuffer, clean
-from vision import Camera
+from .audio import Listener
+from .brain import MODES, Brain, BrainUnavailable
+from .calibration import CalibrationError, Calibrator
+from .focus import FocusAssist
+from .intents import WakeGate, parse
+from .printer import PrinterBridge
+from .projector import Projector
+from .speech import Speaker
+from .textutil import SentenceBuffer, clean
+from .vision import Camera
 
 HELP = """Commands
   /mode online|pc|local   choose where the model runs
@@ -19,6 +21,9 @@ HELP = """Commands
   /files                  list projection and print files
   /project name           project a file onto the desk
   /unproject              stop projecting
+  /calibrate              align the camera to the projector automatically
+  /calibrate check        test whether the saved calibration is still valid
+  /focus                  projector focus assist (tone and bar; /focus stop to end)
   /print name             send a .3mf to the printer (asks to confirm)
   /printer                show printer status
   /voice on|off           turn spoken replies on or off
@@ -29,6 +34,7 @@ Spoken examples
   "MAIE, what is this?"            looks through the camera
   "MAIE, project the bracket"      projects a matching file
   "MAIE, stop projecting"
+  "MAIE, calibrate"
   "MAIE, switch to local mode"
 """
 
@@ -56,6 +62,13 @@ class App:
         self.projector = Projector(cfg["projector"])
         self.printer = PrinterBridge(cfg["printer"])
         self.wake = WakeGate(cfg["wake"])
+        self.calibrator = Calibrator(cfg["calibration"], self.camera, self.projector)
+        self.calibration = self.calibrator.load()
+        self.focus = FocusAssist(
+            cfg["focus_assist"], self.camera, self.projector, lambda: self.calibration, cfg["audio"]["output_device"]
+        )
+        self.focus_thread = None
+        self.focus_stop = threading.Event()
         self.sentences = SentenceBuffer(tts_cfg["min_sentence_chars"])
         self.listener = None
         if not text_only:
@@ -115,6 +128,9 @@ class App:
             threading.Thread(target=self.voice_loop, daemon=True).start()
         self.show_status()
         print("Type a message or speak. Type /help for commands.")
+        if self.cfg["calibration"]["auto_on_start"]:
+            if not self.calibration_valid():
+                self.calibrate()
         while not self.stop.is_set():
             try:
                 kind, text = self.events.get(timeout=0.5)
@@ -129,6 +145,7 @@ class App:
 
     def shutdown(self):
         self.stop.set()
+        self.focus_stop.set()
         self.projector.clear()
         self.camera.close()
         self.printer.close()
@@ -138,6 +155,11 @@ class App:
             state = "reachable" if row["reachable"] else "unreachable"
             marker = "*" if row["name"] == self.brain.mode else " "
             print(f" {marker} {row['name']:7} {state:12} {row['model']} @ {row['host']}")
+        if self.calibration is None:
+            print("   calibration: none (run /calibrate)")
+        else:
+            age = int((time.time() - self.calibration.stamp) / 3600)
+            print(f"   calibration: {self.calibration.markers} markers, {self.calibration.rms:.1f}px error, {age}h old")
 
     def handle(self, kind, text):
         if kind == "voice":
@@ -164,6 +186,9 @@ class App:
             if action == "unproject":
                 self.projector.clear()
                 self.notify("Projection cleared.")
+                return
+            if action == "calibrate":
+                self.calibrate()
                 return
             if action == "see":
                 self.ask(text, with_image=True)
@@ -234,6 +259,98 @@ class App:
             self.awake_until = time.time() + self.cfg["wake"]["follow_up_seconds"]
             self.responding.clear()
 
+    def calibration_valid(self):
+        if self.calibration is None:
+            return False
+        try:
+            error = self.calibrator.verify(self.calibration)
+        except Exception:
+            return False
+        return error is not None and error <= self.cfg["calibration"]["max_rms"] * 2
+
+    def calibrate(self):
+        self.responding.set()
+        try:
+            self.stop_focus()
+            self.notify("Calibrating. Keep your hands and objects off the desk.")
+            self.speaker.wait()
+            try:
+                calibration, lens = self.calibrator.run()
+            except CalibrationError as exc:
+                self.notify(str(exc))
+                return
+            except Exception as exc:
+                self.notify(f"Calibration failed: {exc}")
+                return
+            self.calibration = calibration
+            quality = "good" if calibration.rms <= self.cfg["calibration"]["max_rms"] else "low"
+            message = f"Calibration complete. {calibration.markers} markers, {calibration.rms:.1f} pixel error, accuracy {quality}."
+            if lens is not None:
+                message += " Camera focus locked."
+            self.notify(message)
+        finally:
+            self.speaker.wait()
+            self.responding.clear()
+
+    def check_calibration(self):
+        if self.calibration is None:
+            self.notify("There is no saved calibration yet. Run slash calibrate.")
+            return
+        self.responding.set()
+        try:
+            try:
+                error = self.calibrator.verify(self.calibration)
+            except Exception as exc:
+                self.notify(f"I could not check the calibration: {exc}")
+                return
+            limit = self.cfg["calibration"]["max_rms"] * 2
+            if error is None:
+                self.notify("I could not see the markers, so the calibration needs to be redone.")
+            elif error <= limit:
+                self.notify(f"Calibration is still valid, {error:.1f} pixels off.")
+            else:
+                self.notify(f"Calibration has drifted, {error:.1f} pixels off. Run slash calibrate.")
+        finally:
+            self.speaker.wait()
+            self.responding.clear()
+
+    def focus_report(self, ratios):
+        center = ratios["center"]
+        filled = int(round(center * 20))
+        line = f"\r[{'#' * filled}{'.' * (20 - filled)}] center {center * 100:3.0f}%"
+        for name in ("top-left", "top-right", "bottom-left", "bottom-right"):
+            if name in ratios:
+                line += f" | {name} {ratios[name] * 100:3.0f}%"
+        print(line + "   ", end="", flush=True)
+
+    def focus_running(self):
+        return self.focus_thread is not None and self.focus_thread.is_alive()
+
+    def start_focus(self):
+        if self.focus_running():
+            print("Focus assist is already running. Type /focus stop to end it.")
+            return
+        self.focus_stop.clear()
+        self.responding.set()
+        print("Focus assist on. Turn the projector focus ring slowly past the sharpest point, then back.")
+        print("The tone rises as the image gets sharper. Aim for the bar to be full. Type /focus stop to end.")
+        self.focus_thread = threading.Thread(target=self.focus_worker, daemon=True)
+        self.focus_thread.start()
+
+    def focus_worker(self):
+        try:
+            self.focus.run(self.focus_stop, self.focus_report)
+        except Exception as exc:
+            print(f"\n[focus assist error: {exc}]")
+        finally:
+            print("\nFocus assist ended.")
+            self.responding.clear()
+
+    def stop_focus(self):
+        if self.focus_running():
+            self.focus_stop.set()
+            self.focus_thread.join(timeout=5)
+
     def project(self, path):
         try:
             self.projector.show(path)
@@ -293,6 +410,16 @@ class App:
                 self.project(path)
         elif command == "/unproject":
             self.projector.clear()
+        elif command == "/calibrate":
+            if argument.lower() == "check":
+                self.check_calibration()
+            else:
+                self.calibrate()
+        elif command == "/focus":
+            if argument.lower() == "stop":
+                self.stop_focus()
+            else:
+                self.start_focus()
         elif command == "/print":
             self.request_print(argument)
         elif command == "/printer":

@@ -119,7 +119,7 @@ class Brain:
                     model=backend["model"],
                     messages=self.messages(sent_text, sent_image),
                     stream=True,
-                    keep_alive=self.keep_alive,
+                    keep_alive=backend.get("keep_alive", self.keep_alive),
                     options=backend.get("options") or None,
                 )
                 for chunk in response:

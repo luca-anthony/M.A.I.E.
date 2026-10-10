@@ -65,16 +65,36 @@ class Camera:
             raise RuntimeError("camera returned no frame")
         return frame
 
-    def capture(self):
+    def frame(self):
         self.open()
         frame = self.read()
+        rotation = ROTATIONS.get(self.cfg["rotate"])
+        if rotation is not None:
+            frame = cv2.rotate(frame, rotation)
+        return frame
+
+    def lock_focus(self):
+        if self.kind != "picamera2":
+            return None
+        try:
+            from libcamera import controls
+
+            self.device.set_controls({"AfMode": controls.AfModeEnum.Auto})
+            success = self.device.autofocus_cycle()
+            position = self.device.capture_metadata().get("LensPosition")
+            if not success or position is None:
+                return None
+            self.device.set_controls({"AfMode": controls.AfModeEnum.Manual, "LensPosition": position})
+            return float(position)
+        except Exception:
+            return None
+
+    def capture(self):
+        frame = self.frame()
         height, width = frame.shape[:2]
         scale = min(1.0, self.cfg["max_side"] / max(height, width))
         if scale < 1.0:
             frame = cv2.resize(frame, (int(width * scale), int(height * scale)))
-        rotation = ROTATIONS.get(self.cfg["rotate"])
-        if rotation is not None:
-            frame = cv2.rotate(frame, rotation)
         ok, buffer = cv2.imencode(".jpg", frame, [cv2.IMWRITE_JPEG_QUALITY, 88])
         if not ok:
             raise RuntimeError("could not encode frame")

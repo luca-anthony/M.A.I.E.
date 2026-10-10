@@ -5,6 +5,24 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 
 
+DEFAULTS = {
+    "calibration": {
+        "file": "calibration.json",
+        "cols": 4,
+        "rows": 3,
+        "settle_seconds": 2.0,
+        "attempts": 8,
+        "min_markers": 6,
+        "max_rms": 5.0,
+        "ransac_pixels": 6.0,
+        "autofocus": True,
+        "auto_on_start": False,
+    },
+    "focus_assist": {"interval": 0.25, "timeout_seconds": 120, "tone": True},
+    "projector": {"resolution": None},
+}
+
+
 def merge(base, extra):
     out = dict(base)
     for key, value in extra.items():
@@ -44,7 +62,7 @@ def resolve(path):
 def load(path=None, profile=None, mode=None):
     load_env(ROOT / ".env")
     cfg_path = Path(path) if path else ROOT / "config.json"
-    cfg = json.loads(cfg_path.read_text())
+    cfg = merge(DEFAULTS, json.loads(cfg_path.read_text()))
     chosen = profile or cfg.get("profile", "auto")
     if chosen == "auto":
         chosen = detect_profile()

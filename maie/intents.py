@@ -18,6 +18,7 @@ MODE_RE = re.compile(
 RESET_RE = re.compile(
     r"\b(?:reset|clear|forget)\b.*\b(?:conversation|memory|history|chat|everything)\b", re.I
 )
+CALIBRATE_RE = re.compile(r"\b(?:re-?calibrate|calibrate|calibration)\b", re.I)
 UNPROJECT_RE = re.compile(
     r"\b(?:stop|clear|hide|turn off|close|remove)\b.*\b(?:projection|projecting|projector|blueprint|schematic|display)\b",
     re.I,
@@ -36,6 +37,8 @@ def parse(text, triggers):
         return ("reset", None)
     if UNPROJECT_RE.search(text):
         return ("unproject", None)
+    if CALIBRATE_RE.search(text):
+        return ("calibrate", None)
     lowered = text.lower()
     if any(trigger in lowered for trigger in triggers):
         return ("see", None)
